@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- saved from url=(0132)https://storage.googleapis.com/runable-templates/cli-uploads%2Fq64Kjt0idGYHmkgjLhIaX24ONyKDfxbt%2FN5Dfv2SUEwiIkmad2iLA4%2Findex.html -->
 <html lang="pt-BR"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -117,11 +116,7 @@
     </div>
     <p class="hint">Deixe os campos vazios para gerar aleatório. Preencha para fixar.</p>
     <button onclick="generate()">Gerar números</button>
-    <div class="result" id="genResult"><textarea id="genOut" readonly="">1533892962439166|05|2030|544
-8019945747942637|01|2028|080
-0651022903059109|11|2032|930
-5810126548976812|01|2029|763
-4392393125027653|04|2032|109</textarea><button onclick="copyAll(this)">Copiar todos</button></div>
+    <div class="result" id="genResult"></div>
   </div>
 
   <!-- VALIDAR -->
@@ -150,7 +145,6 @@ function luhnCheck(num){
 }
 
 function luhnDigit(partial){
-  // partial = string without check digit
   let sum=0, alt=true;
   for(let i=partial.length-1;i>=0;i--){
     let d=parseInt(partial[i],10);
@@ -171,7 +165,7 @@ function genOne(prefix, length){
 
 function genDate(){
   const mm = String(Math.floor(Math.random()*12)+1).padStart(2,'0');
-  const year = new Date().getFullYear() + 1 + Math.floor(Math.random()*6); // 1-6 anos no futuro
+  const year = new Date().getFullYear() + 1 + Math.floor(Math.random()*6);
   return {mm: mm, yyyy: String(year)};
 }
 
@@ -193,40 +187,41 @@ function generate(){
   const box = document.getElementById('genResult');
   box.innerHTML='';
 
-  // gera a quantidade exata; tenta evitar duplicados mas nunca gera menos
-  const seen = new Set();
-  const list = [];
-  let tries=0;
-  while(list.length<qty){
+  // Set para eliminar duplicados da linha completa
+  const seenLines = new Set();
+  let tries = 0;
+  const maxTries = qty * 500; // Limite de tentativas de segurança
+
+  while(seenLines.size < qty && tries < maxTries){
     const n = genOne(prefix, length);
-    if(!seen.has(n) || tries>qty*60){ seen.add(n); list.push(n); }
+    const cvvLen = n.length === 15 ? 4 : 3;
+    let line = n;
+
+    if(withDate){
+      const d = genDate();
+      const mm = fixMM ? fixMM.padStart(2,'0') : d.mm;
+      const yyyy = fixYYYY ? fixYYYY : d.yyyy;
+      line += '|' + mm + '|' + yyyy;
+    }
+    if(withCvv){
+      line += '|' + (fixCvv ? fixCvv : genCvv(cvvLen));
+    }
+
+    seenLines.add(line);
     tries++;
   }
 
-  const lines=[];
-  list.forEach(n=>{
-    const cvvLen = n.length===15 ? 4 : 3; // Amex usa 4
-    let line = n;
-    if(withDate){
-      const d=genDate();
-      const mm = fixMM ? fixMM.padStart(2,'0') : d.mm;
-      const yyyy = fixYYYY ? fixYYYY : d.yyyy;
-      line += '|'+mm+'|'+yyyy;
-    }
-    if(withCvv){
-      line += '|'+(fixCvv ? fixCvv : genCvv(cvvLen));
-    }
-    lines.push(line);
-  });
+  const lines = Array.from(seenLines);
   const text = lines.join('\n');
-  box.innerHTML=`<textarea id="genOut" readonly>${text}</textarea><button onclick="copyAll(this)">Copiar todos</button>`;
+  box.innerHTML = `<textarea id="genOut" readonly>${text}</textarea><button onclick="copyAll(this, ${lines.length})">Copiar todos (${lines.length})</button>`;
 }
 
-function copyAll(btn){
+function copyAll(btn, count){
   const ta=document.getElementById('genOut');
   navigator.clipboard.writeText(ta.value).then(()=>{
-    const old=btn.textContent; btn.textContent='Copiado!';
-    setTimeout(()=>btn.textContent=old,1300);
+    const old = btn.textContent;
+    btn.textContent = 'Copiado!';
+    setTimeout(() => btn.textContent = `Copiar todos (${count})`, 1300);
   });
 }
 
@@ -236,13 +231,6 @@ function validate(){
   if(!v.replace(/\D/g,'')){ out.innerHTML=''; return; }
   const ok=luhnCheck(v);
   out.innerHTML=`<div class="status ${ok?'ok':'bad'}">${ok?'✓ Válido (passa no Luhn)':'✗ Inválido'}</div>`;
-}
-
-function copy(text,btn){
-  navigator.clipboard.writeText(text).then(()=>{
-    const old=btn.textContent; btn.textContent='Copiado!';
-    setTimeout(()=>btn.textContent=old,1200);
-  });
 }
 
 document.querySelectorAll('.tab').forEach(t=>{
@@ -257,6 +245,5 @@ document.querySelectorAll('.tab').forEach(t=>{
 document.getElementById('check').addEventListener('input', validate);
 generate();
 </script>
-
 
 </body></html>
